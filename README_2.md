@@ -30,7 +30,7 @@ Ouputs :
 ### Pre-processing Proteomics
 Count missing values / PCA
 Normalization ( NormalizerDE, selection based on report)
-Plotting Distribution / Dimension reduction : PCA 2 / UMAP / PLS-DA
+Plotting Distribution / Dimension reduction : PCA 2
 
 ### Pre-processing Transcriptomics
 Calculation of Normalization factors
