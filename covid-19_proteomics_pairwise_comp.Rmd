@@ -1,0 +1,176 @@
+---
+title: "Pairwise comparisons proteomics"
+output: html_notebook
+---
+
+
+## Data specificity
+- paired samples
+- time course experiments
+- 4 conditions(6 comparisons)
+
+
+## Data input and output
+Inputs : 
+Proteomics raw data is submitted with uniprot accession as row and samples as columns.
+Annotation file with as columns 1) Uniprot Accession 2) Gene name 
+
+Ouputs :  
+1)  PCA 1/ 2, UMAP, PLS-DA, Distribution after norm
+2)  Heatmap, pathways, figure with pathways
+3)  Scatter plot, Correlation matrix, pathways, figure pathways
+
+
+## Outline 
+### Pre-processing
+Count missing values / PCA 1
+Normalization ( NormalizerDE, selection based on report)
+Plotting Distribution / Dimension reduction : PCA 2 / UMAP / PLS-DA
+
+### Multiple comparisons
+LIMMA : 6 comparisons (UNINF/T1 / T2 / T3) paired samples
+Heatmap (hierarchical clustering) with proteins significant in at least one infected sample compared to control (pvalue  < 0.05).
+Cytoscape Network → Reactome on obtained clusters
+
+### Correlation viral/ host proteins
+Scatter plot log2 (viral_protein_inf_sample/viral_prot_control) vs time after infection
+Calculate averaged profile of viral proteins
+Pearson correlation host proteins/ averaged profile of all viral proteins => select FDR < 0.01
+Cytoscape Network → biological process GO terms (plot network)
+
+
+### clean environment
+```{r}
+rm(list=ls())
+```
+
+### set directory
+```{r setup}
+    knitr::opts_knit$set(root.dir = normalizePath("~/Desktop/Corona_omics/")) 
+```
+
+### load packages
+```{r}
+library(ggplot2)
+library(limma)
+library(dplyr)
+library(xlsx)
+library(RColorBrewer)
+library(gplots)
+library(ggrepel)
+library(knitr)
+library(ggfortify)
+#library(NormalyzerDE)
+opts_chunk$set(echo = TRUE)
+options(bitmapType="cairo")
+```
+
+### load own functions
+```{r}
+source("src/usefull_functions.R")
+```
+```{r}
+name_ana <- "covid-19_proteomics"
+
+nb_samples <- 3
+
+# define conditions
+t0 <- "UNINF"
+t24 <- "H24PI"
+t48 <- "H48PI"
+t72 <- "H72PI"
+
+# define associated colors
+c_t0 <- "#B1A78C"
+c_t24 <- "#687E8A"
+c_t48 <- "#41607D"
+c_t72 <- "#09253B"
+  
+condition <- as.factor(c(rep(t0, 2), rep(t24, nb_samples), rep(t48, nb_samples), rep(t72, nb_samples)))
+colors <- as.factor(c(rep(c_t0, nb_samples), rep(c_t24, nb_samples), rep(c_t48, nb_samples), rep(c_t72, nb_samples)))
+gg_colors <- c(c_t24,c_t48, c_t72, c_t0)
+
+input <- read.delim("processing/norm_files/covid-19_proteomics_norm_file.txt")
+rownames(input) <- input$X
+input$X <- NULL
+
+annotationInfo <- read.csv("processing/covid-19_proteomics/covid-19_proteomics_annotationInfo.csv")
+annotationInfo$Gene_name <- gsub(";.*","",annotationInfo$Gene_name)
+annotationInfo$X <- NULL
+```
+
+## remove outlier due to technical error
+```{r}
+input$UNINF_3 <- NULL
+```
+
+## Multiple comparisons
+
+## four time points experiments = 
+
+## set levels
+```{r}
+groups <- as.factor(condition)
+design <- model.matrix( ~ 0 + groups)
+colnames(design) <- levels(groups)
+```
+
+## fit model
+```{r}
+fit <- lmFit(input, design)
+```
+
+
+```{r}
+list_comp <- c("H24PI-UNINF", "H48PI-UNINF","H72PI-UNINF","H48PI-H24PI", "H72PI-H24PI","H72PI-H48PI")
+```
+
+```{r}
+DGE_results <- data.frame(annotationInfo)
+DGE_results$X <- NULL
+```
+
+```{r}
+antiviral_database <- read.xlsx("data/AntiViral_DB.xlsx", 3)
+```
+```{r}
+for(comp in list_comp){
+  c2 <- substr(comp, 1,5)[1]
+  c1 <- substr(comp, 7,11)[1]
+  dge <- extract_limma(fit, design, name_ana, c1, c2)
+  print(dge)
+  dge <- dge[dge$Gene_name %in% antiviral_database$Genes, ]
+  top_table_up <- dge[dge$Significance_2 == "upregulated",]
+  top_table_down <- dge[dge$Significance_2 == "downregulated",]
+  print(top_table_up)
+  name_up <- paste0("results/",name_ana,"/Pathways_heatmap/prot_up_regulated_", comp, ".txt")
+  name_down <- paste0("results/",name_ana,"/Pathways_heatmap/prot_down_regulated_", comp, ".txt")
+  print(name_up)
+  print(name_down)
+  write.table(data.frame(top_table_up$Gene_name), file = name_up, sep = "\t",
+            row.names = FALSE)
+  write.table(data.frame(data = top_table_down$Gene_name), file = name_down, sep = "\t",
+            row.names = FALSE)
+}
+```
+
+
+```{r}
+system("sed 's/\"//g' results/covid-19_proteomics/Pathways_heatmap/prot_up_regulated_H24PI-UNINF.txt > results/covid-19_proteomics/Pathways_heatmap/prot_up_regulated_H24PI-UNINF_2.txt")
+
+system("sed 's/\"//g' results/covid-19_proteomics/Pathways_heatmap/prot_down_regulated_H24PI-UNINF.txt > results/covid-19_proteomics/Pathways_heatmap/prot_down_regulated_H24PI-UNINF_2.txt")
+```
+
+```{r}
+system("sed 's/\"//g' results/covid-19_proteomics/Pathways_heatmap/prot_up_regulated_H48PI-H24PI.txt > results/covid-19_proteomics/Pathways_heatmap/prot_up_regulated_H48PI-H24PI_2.txt")
+
+system("sed 's/\"//g' results/covid-19_proteomics/Pathways_heatmap/prot_down_regulated_H48PI-H24PI.txt > results/covid-19_proteomics/Pathways_heatmap/prot_down_regulated_H48PI-H24PI_2.txt")
+```
+
+```{r}
+system("sed 's/\"//g' results/covid-19_proteomics/Pathways_heatmap/prot_up_regulated_H72PI-H48PI.txt > results/covid-19_proteomics/Pathways_heatmap/prot_up_regulated_H72PI-H48PI_2.txt")
+
+system("sed 's/\"//g' results/covid-19_proteomics/Pathways_heatmap/prot_down_regulated_H72PI-H48PI.txt > results/covid-19_proteomics/Pathways_heatmap/prot_down_regulated_H72PI-H48PI_2.txt")
+```
+
+

@@ -1,0 +1,234 @@
+---
+title: "Time serie proteomics"
+output: html_notebook
+---
+
+
+### clean environment
+```{r}
+rm(list=ls())
+```
+
+### set directory
+```{r setup}
+    knitr::opts_knit$set(root.dir = normalizePath("~/Desktop/Corona_omics/")) 
+```
+
+### load packages
+```{r}
+library(Glimma)
+library(edgeR)
+library(psych)
+library(GGally)
+library(ggplot2)
+library(limma)
+library(dplyr)
+library(xlsx)
+library(RColorBrewer)
+library(gplots)
+library(ggrepel)
+library(knitr)
+library(ggfortify)
+#library(NormalyzerDE)
+opts_chunk$set(echo = TRUE)
+options(bitmapType="cairo")
+```
+
+### load own functions
+```{r}
+source("src/usefull_functions.R")
+```
+```{r}
+name_ana <- "covid-19_transcriptomics"
+```
+
+```{r}
+dir.create(paste0("processing/", name_ana))
+```
+
+```{r}
+dir.create(paste0("results/", name_ana))
+dir.create(paste0("results/", name_ana, "/figures"))
+dir.create(paste0("results/", name_ana, "/DGE"))
+dir.create(paste0("results/", name_ana, "/Time_series"))
+dir.create(paste0("results/", name_ana, "/GSEA"))
+dir.create(paste0("results/", name_ana, "/Pathways_heatmap"))
+```
+
+```{r}
+annotation_info_1 <- read.delim("data/annotation_ensembl_id_hugo_id.txt", header = FALSE, stringsAsFactors = FALSE)
+annotation_info_2 <- read.delim("data/annotationInfo_Uniprot_gene_name", header = FALSE, stringsAsFactors = FALSE)
+```
+
+```{r}
+names(annotation_info_1) <- c("Accession", "Ensembl_ID")
+names(annotation_info_2) <- c("Accession", "Gene_name")
+AnnotationInfo <- merge(annotation_info_2, annotation_info_1, by = "Accession")
+```
+
+```{r}
+input <- read.delim("data/Transcriptomics/Coding_Count.txt")
+countData <- input[,-c(11:13)] ## remove unif
+```
+```{r}
+assay <- rep(c("Sample..1", "Sample..2", "Sample..3"), each = 3)
+time.grp <- rep(c(24, 48, 72), 3)
+```
+
+```{r}
+countData <- countData[rowSums(is.na(countData)) != ncol(countData), ] ## remove empty lines
+```
+
+```{r}
+countData <- select(countData, ID, contains("_1"),  contains("_2"), contains("_3"))
+```
+
+```{r}
+names(countData)
+rownames(countData) <- countData$ID
+```
+
+```{r}
+coldata <- data.frame(samples = colnames(countData)[-1], time = as.factor(time.grp), assay = as.factor(assay))
+#coldata$time <- relevel(coldata$time, "uninf")
+```
+
+```{r}
+d0 <- DGEList(countData[-1])
+```
+
+## calculate norm factors
+```{r}
+d0 <- calcNormFactors(d0)
+d0
+```
+
+## filter low expression transcripts
+```{r}
+cutoff <- 1
+drop <- which(apply(cpm(d0), 1, max) < cutoff)
+d <- d0[-drop,] 
+dim(d) 
+```
+```{r}
+groups <- as.factor(assay)
+design <- model.matrix( ~0 + groups + time.grp)
+```
+
+```{r}
+y <- voom(d, design, plot = T)
+```
+
+## 1) LIMMA
+## set levels
+```{r}
+groups <- as.factor(assay)
+design <- model.matrix( ~0 + groups + time.grp)
+```
+
+```{r}
+countData[is.na(countData)] <- 0
+```
+
+## fit model
+```{r}
+fit <- lmFit(y, design)
+```
+
+```{r}
+cont.matrix <- makeContrasts(
+  time = "time.grp",
+  levels = design
+)
+```
+
+```{r}
+fit.cont <- contrasts.fit(fit, cont.matrix)
+fit.cont <- eBayes(fit.cont)
+top_table <- topTable(fit.cont, adjust="fdr", n = Inf)
+top_table$Ensembl_ID <- rownames(top_table)
+top_table_2 <- merge(AnnotationInfo, top_table, by = "Ensembl_ID")
+#save_file_excel(top_table_2, "LIMMA_time_series_transcriptomics", paste0("results/", name_ana, "/Time_series/"))
+top_table_3 <- top_table_2
+top_table_3 <-top_table_3[top_table_3$adj.P.Val < 0.05, ]
+top_table_3$Significance <- ifelse(top_table_3$logFC < 0, paste0("downregulated"), paste0("upregulated"))
+save_file_excel(top_table_3, "LIMMA_time_series_filtered_transcriptomics", paste0("results/", name_ana, "/Time_series/"))
+```
+
+```{r}
+top_table_3 <- top_table_3[!duplicated(top_table_3$Gene_name),]
+```
+
+
+```{r}
+antiviral_database <- read.xlsx("data/AntiViral_DB.xlsx", 3)
+```
+
+```{r}
+top_table_3 <- top_table_3[top_table_3$Gene_name %in% antiviral_database$Genes,]
+```
+
+```{r}
+input$Ensembl_ID <- input$ID
+
+input <- select(input, Ensembl_ID, contains("Uni"), contains("24"),  contains("48"), contains("72"))
+```
+
+```{r}
+data_heatmap <- merge(top_table_3, input, by = "Ensembl_ID")
+data_heatmap <- data_heatmap[order(data_heatmap$logFC), ]
+```
+
+```{r}
+#data_heatmap <- data_heatmap[data_heatmap$adj.P.Val < 0.008,]
+```
+```{r}
+genes <- data_heatmap$Gene_name
+```
+
+```{r}
+my_palette <- colorRampPalette(c("blue","white","red"))(n=20)
+```
+
+```{r}
+data_heatmap_2 <- scale(t(data_heatmap[,-c(1:10)]))
+```
+```{r}
+colnames(data_heatmap_2) <- genes
+```
+```{r}
+data_heatmap_2 <- data.frame(t(data_heatmap_2))
+```
+
+
+```{r}
+pdf(paste0("results/", name_ana, "/figures/heatmap_antiviral_transcripts.pdf"), height = 20)
+heatmap.2(as.matrix(data_heatmap_2), dendrogram = "both", Colv = FALSE, Rowv = FALSE, trace = "none", scale = "none", col = my_palette, key = FALSE, keysize = 0.01, cexCol = 0.7)
+dev.off()
+```
+
+```{r}
+top_table_up <- top_table_3[top_table_3$Significance == "upregulated",]
+top_table_down <- top_table_3[top_table_3$Significance == "downregulated",]
+```
+
+```{r}
+write.table(data.frame(top_table_up$Gene_name), file = paste0("results/", name_ana, "/Time_series/12F_up_regulated_txn.txt"), sep = "\t",
+            row.names = FALSE)
+
+write.table(data.frame(data = top_table_down$Gene_name), file = paste0("results/", name_ana, "/Time_series/12F_down_regulated_txn.txt"), sep = "\t",
+            row.names = FALSE)
+```
+
+```{r}
+system("sed 's/\"//g' results/covid-19_transcriptomics/Time_series/12F_down_regulated_txn.txt > results/covid-19_transcriptomics/Time_series/12F_down_regulated_2_txn.txt")
+```
+
+```{r}
+system("sed 's/\"//g' results/covid-19_transcriptomics/Time_series/12F_up_regulated_txn.txt > results/covid-19_transcriptomics/Time_series/12F_up_regulated_2_txn.txt")
+```
+
+
+
+
+

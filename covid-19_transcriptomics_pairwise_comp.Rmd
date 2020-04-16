@@ -1,0 +1,184 @@
+---
+title: "Transcriptomics pairwise comparisons"
+output: html_notebook
+---
+
+
+### clean environment
+```{r}
+rm(list=ls())
+```
+
+### set directory
+```{r setup}
+    knitr::opts_knit$set(root.dir = normalizePath("~/Desktop/Corona_omics/")) 
+```
+
+### load packages
+```{r}
+library(edgeR)
+library(psych)
+library(ggplot2)
+library(limma)
+library(dplyr)
+library(xlsx)
+library(RColorBrewer)
+library(gplots)
+library(ggrepel)
+library(knitr)
+library(ggfortify)
+#library(NormalyzerDE)
+opts_chunk$set(echo = TRUE)
+options(bitmapType="cairo")
+```
+
+### load own functions
+```{r}
+source("src/usefull_functions.R")
+```
+
+```{r}
+name_ana <- "covid-19_transcriptomics"
+
+nb_samples <- 3
+
+# define conditions
+t0 <- "UNINF"
+t24 <- "H24PI"
+t48 <- "H48PI"
+t72 <- "H72PI"
+
+# define associated colors
+c_t0 <- "#B1A78C"
+c_t24 <- "#687E8A"
+c_t48 <- "#41607D"
+c_t72 <- "#09253B"
+  
+condition <- as.factor(c(rep(t24, nb_samples), rep(t48, nb_samples), rep(t72, nb_samples), rep(t0, 3)))
+colors <- as.factor(c(rep(c_t24, nb_samples), rep(c_t48, nb_samples), rep(c_t72, nb_samples), rep(c_t0, nb_samples)))
+```
+
+```{r}
+annotation_info_1 <- read.delim("data/annotation_ensembl_id_hugo_id.txt", header = FALSE, stringsAsFactors = FALSE)
+annotation_info_2 <- read.delim("data/annotationInfo_Uniprot_gene_name", header = FALSE, stringsAsFactors = FALSE)
+```
+
+```{r}
+names(annotation_info_1) <- c("Accession", "Ensembl_ID")
+names(annotation_info_2) <- c("Accession", "Gene_name")
+annotationInfo <- merge(annotation_info_2, annotation_info_1, by = "Accession")
+```
+
+```{r}
+input <- read.delim("data/Transcriptomics/Coding_Count.txt")
+```
+```{r}
+countData <- input
+```
+
+```{r}
+countData <- countData[rowSums(is.na(countData)) != ncol(countData), ] ## remove empty lines
+```
+
+```{r}
+condition
+```
+
+```{r}
+names(countData)
+rownames(countData) <- countData$ID
+
+```
+
+```{r}
+d0 <- DGEList(countData[-1])
+```
+
+## calculate norm factors
+```{r}
+d0 <- calcNormFactors(d0)
+d0
+```
+
+## filter low expression transcripts
+```{r}
+cutoff <- 1
+drop <- which(apply(cpm(d0), 1, max) < cutoff)
+d <- d0[-drop,] 
+dim(d) 
+```
+## 1) LIMMA
+
+## set levels
+```{r}
+groups <- as.factor(condition)
+design <- model.matrix( ~ 0 + groups)
+colnames(design) <- levels(groups)
+```
+
+```{r}
+y <- voom(d, design, plot = T)
+```
+
+## fit model
+```{r}
+fit <- lmFit(y, design)
+```
+
+```{r}
+list_comp <- c("H24PI-UNINF","H48PI-H24PI", "H72PI-H48PI")
+```
+
+```{r}
+DGE_results <- data.frame(annotationInfo)
+DGE_results$X <- NULL
+```
+
+```{r}
+antiviral_database <- read.xlsx("data/AntiViral_DB.xlsx", 3)
+```
+
+```{r}
+for(comp in list_comp){
+  c2 <- substr(comp, 1,5)[1]
+  c1 <- substr(comp, 7,11)[1]
+  dge <- extract_limma_transcriptomics(fit, design, name_ana, c1, c2)
+  print(dge)
+  dge <- dge[dge$Gene_name %in% antiviral_database$Genes, ]
+  top_table_up <- dge[dge$Significance_2 == "upregulated",]
+  top_table_down <- dge[dge$Significance_2 == "downregulated",]
+  print(top_table_up)
+  name_up <- paste0("results/",name_ana,"/Pathways_heatmap/txn_up_regulated_", comp, ".txt")
+  name_down <- paste0("results/",name_ana,"/Pathways_heatmap/txn_down_regulated_", comp, ".txt")
+  print(name_up)
+  print(name_down)
+  write.table(data.frame(top_table_up$Gene_name), file = name_up, sep = "\t",
+            row.names = FALSE)
+  write.table(data.frame(data = top_table_down$Gene_name), file = name_down, sep = "\t",
+            row.names = FALSE)
+  #dge$Ensembl_ID <- rownames(dge)
+  #dge <- select(dge, Ensembl_ID, logFC, adj.P.Val)
+  #colnames(dge)[2:3] <- c(paste0("logFC_",c2, "-", c1), paste0("adj.P.Val_",c2, "-", c1))
+  #print(DGE_results)
+  #DGE_results <- merge(DGE_results, dge, by = "Ensembl_ID")
+}
+```
+
+```{r}
+system("sed 's/\"//g' results/covid-19_transcriptomics/Pathways_heatmap/txn_up_regulated_H24PI-UNINF.txt > results/covid-19_transcriptomics/Pathways_heatmap/txn_up_regulated_H24PI-UNINF_2.txt")
+
+system("sed 's/\"//g' results/covid-19_transcriptomics/Pathways_heatmap/txn_down_regulated_H24PI-UNINF.txt > results/covid-19_transcriptomics/Pathways_heatmap/txn_down_regulated_H24PI-UNINF_2.txt")
+```
+
+```{r}
+system("sed 's/\"//g' results/covid-19_transcriptomics/Pathways_heatmap/txn_up_regulated_H48PI-H24PI.txt > results/covid-19_transcriptomics/Pathways_heatmap/txn_up_regulated_H48PI-H24PI_2.txt")
+
+system("sed 's/\"//g' results/covid-19_transcriptomics/Pathways_heatmap/txn_down_regulated_H48PI-H24PI.txt > results/covid-19_transcriptomics/Pathways_heatmap/txn_down_regulated_H48PI-H24PI_2.txt")
+```
+
+```{r}
+system("sed 's/\"//g' results/covid-19_transcriptomics/Pathways_heatmap/txn_up_regulated_H72PI-H48PI.txt > results/covid-19_transcriptomics/Pathways_heatmap/txn_up_regulated_H72PI-H48PI_2.txt")
+
+system("sed 's/\"//g' results/covid-19_transcriptomics/Pathways_heatmap/txn_down_regulated_H72PI-H48PI.txt > results/covid-19_transcriptomics/Pathways_heatmap/txn_down_regulated_H72PI-H48PI_2.txt")
+```
+

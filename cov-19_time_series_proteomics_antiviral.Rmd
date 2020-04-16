@@ -1,0 +1,234 @@
+---
+title: "Time serie proteomics"
+output: html_notebook
+---
+
+
+### clean environment
+```{r}
+rm(list=ls())
+```
+
+### set directory
+```{r setup}
+    knitr::opts_knit$set(root.dir = normalizePath("~/Desktop/Corona_omics/")) 
+```
+
+### load packages
+```{r}
+library(psych)
+library(GGally)
+library(ggplot2)
+library(limma)
+library(dplyr)
+library(xlsx)
+library(RColorBrewer)
+library(gplots)
+library(ggrepel)
+library(knitr)
+library(ggfortify)
+#library(NormalyzerDE)
+opts_chunk$set(echo = TRUE)
+options(bitmapType="cairo")
+```
+
+### load own functions
+```{r}
+source("src/usefull_functions.R")
+```
+```{r}
+name_ana <- "covid-19_proteomics"
+
+nb_samples <- 3
+
+# define conditions
+t0 <- "UNINF"
+t24 <- "H24PI"
+t48 <- "H48PI"
+t72 <- "H72PI"
+
+# define associated colors
+c_t0 <- "#B1A78C"
+c_t24 <- "#687E8A"
+c_t48 <- "#41607D"
+c_t72 <- "#09253B"
+  
+condition <- as.factor(c(rep(t0, nb_samples), rep(t24, nb_samples), rep(t48, nb_samples), rep(t72, nb_samples)))
+time <- c(rep(0, nb_samples), rep(24, nb_samples), rep(48, nb_samples), rep(72, nb_samples))
+colors <- as.factor(c(rep(c_t0, nb_samples), rep(c_t24, nb_samples), rep(c_t48, nb_samples), rep(c_t72, nb_samples)))
+gg_colors <- c(c_t24,c_t48, c_t72, c_t0)
+
+input <- read.delim("processing/norm_files/covid-19_proteomics_norm_file.txt")
+rownames(input) <- input$X
+input$X <- NULL
+
+annotationInfo <- read.csv("processing/covid-19_proteomics/covid-19_proteomics_annotationInfo.csv")
+annotationInfo$Gene_name <- gsub(";.*","",annotationInfo$Gene_name)
+annotationInfo$X <- NULL
+```
+```{r}
+source("src/usefull_functions.R")
+```
+
+```{r}
+input_2 <- select(input, contains("24"),  contains("48"), contains("72"))
+```
+
+```{r}
+input_2 <- select(input_2, contains("_1"),  contains("_2"), contains("_3"))
+```
+
+```{r}
+names(input_2)
+```
+
+
+```{r}
+assay <- c(rep("Sample..1", 3),
+           rep("Sample..2", 3),
+           rep("Sample..3", 3))
+
+time.grp <- rep(c(24, 48, 72), 3)
+```
+
+## 1) LIMMA
+
+## set levels
+```{r}
+groups <- as.factor(assay)
+design <- model.matrix( ~0 + groups + time.grp)
+```
+
+## fit model
+```{r}
+fit <- lmFit(input_2, design)
+```
+
+```{r}
+cont.matrix <- makeContrasts(
+  time = "time.grp",
+  levels = design
+)
+```
+
+```{r}
+fit.cont <- contrasts.fit(fit, cont.matrix)
+fit.cont <- eBayes(fit.cont)
+top_table <- topTable(fit.cont, adjust="fdr", n = Inf)
+top_table$Accession <- rownames(top_table)
+top_table_2 <- merge(annotationInfo, top_table, by = "Accession")
+save_file_excel(top_table_2, "LIMMA_time_series", paste0("results/", name_ana, "/Time_series/"))
+top_table_3 <- top_table_2
+top_table_3 <-top_table_3[top_table_3$adj.P.Val < 0.05, ]
+top_table_3$Significance <- ifelse(top_table_3$logFC < 0, paste0("downregulated"), paste0("upregulated"))
+save_file_excel(top_table_3, "LIMMA_time_series_filtered", paste0("results/", name_ana, "/Time_series/"))
+```
+
+```{r}
+antiviral_database <- read.xlsx("data/AntiViral_DB.xlsx", 3)
+```
+
+```{r}
+top_table_3 <- top_table_3[top_table_3$Gene_name %in% antiviral_database$Genes,]
+```
+
+
+```{r}
+top_table_3 <- top_table_3[top_table_3$Gene_name != "",]
+```
+
+```{r}
+input$Accession <- rownames(input)
+input <- select(input, Accession, contains("UNI"), contains("24"),  contains("48"), contains("72"))
+```
+
+```{r}
+data_heatmap <- merge(top_table_3, input, by = "Accession")
+data_heatmap <- data_heatmap[order(data_heatmap$logFC), ]
+```
+```{r}
+genes <- data_heatmap$Gene_name
+```
+
+```{r}
+my_palette <- colorRampPalette(c("blue","white","red"))(n=20)
+```
+
+```{r}
+data_heatmap_2 <- scale(t(data_heatmap[,-c(1:9)]))
+```
+```{r}
+colnames(data_heatmap_2) <- genes
+```
+```{r}
+data_heatmap_2 <- data.frame(t(data_heatmap_2))
+```
+
+```{r}
+pdf(paste0("results/", name_ana, "/figures/covid-19_proteomics_heatmap.pdf"), height = 20)
+heatmap.2(as.matrix(data_heatmap_2), dendrogram = "both", Colv = FALSE, Rowv = FALSE, trace = "none", scale = "none", col = my_palette, key = FALSE, keysize = 0.01, cexCol = 0.7)
+dev.off()
+```
+
+```{r}
+top_table_up <- top_table_3[top_table_3$Significance == "upregulated",]
+top_table_down <- top_table_3[top_table_3$Significance == "downregulated",]
+```
+
+```{r}
+write.table(data.frame(top_table_up$Gene_name), file = paste0("results/", name_ana, "/Time_series/12F_up_regulated.txt"), sep = "\t",
+            row.names = FALSE)
+
+write.table(data.frame(data = top_table_down$Gene_name), file = paste0("results/", name_ana, "/Time_series/12F_down_regulated.txt"), sep = "\t",
+            row.names = FALSE)
+```
+
+```{r}
+system("sed 's/\"//g' results/covid-19_proteomics/Time_series/12F_down_regulated.txt > results/covid-19_proteomics/Time_series/12F_down_regulated_2.txt")
+```
+
+```{r}
+system("sed 's/\"//g' results/covid-19_proteomics/Time_series/12F_up_regulated.txt > results/covid-19_proteomics/Time_series/12F_up_regulated_2.txt")
+```
+
+## python code (run in ipython)
+
+import gseapy
+
+gseapy.enrichr(gene_list="results/covid-19_proteomics/Time_series/12F_up_regulated_2.txt",description='12F_up',gene_sets="data/KEGG_advanced/KEGG.gmt",outdir='results/GSEA',cutoff=0.5,verbose=True, background  = 7757)
+
+gseapy.enrichr(gene_list="results/covid-19_proteomics/Time_series/12F_down_regulated_2.txt",description='12F_down',gene_sets="data/KEGG_advanced/KEGG.gmt",outdir='results/GSEA',cutoff=0.5,verbose=True, background  = 7757)
+
+
+## extract viral proteins
+```{r}
+list_viral_proteins <- c("P0DTC9", "P0DTC5", "Q9P266", "P0DTC2", "P0DTC3", "P0DTC1")
+```
+
+```{r}
+data_viral <- input[input$Accession %in% list_viral_proteins,]
+rownames(data_viral) <- data_viral$Accession
+data_viral$Accession <- NULL
+data_viral <- select(data_viral, contains("UNI"), contains("24"),  contains("48"), contains("72"))
+```
+
+```{r}
+data_viral <- data.frame(t(data_viral))
+```
+
+```{r}
+input_plot <- data_viral
+input_plot$time <- c(rep(0, nb_samples), rep(24, nb_samples), rep(48, nb_samples), rep(72, nb_samples))
+input_plot$group <- as.factor(rep(c(1, 2,3), 4))
+```
+```{r}
+library(ggplot2)
+```
+
+```{r}
+for(i in 1:6){
+  pltbase <- ggplot()+ geom_line(data = input_plot, aes(x=time, y=input_plot[,i], group=group), size=2, color = "black", alpha=0.4)+ theme_classic()
+  ggsave(paste0("results/", name_ana, "/figures/", "viral_protein_", names(input_plot)[i], ".pdf"))
+}
+```
+

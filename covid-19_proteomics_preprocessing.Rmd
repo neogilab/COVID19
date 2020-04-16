@@ -1,0 +1,230 @@
+---
+title: "Analysis covid-19 preprocessing"
+output: html_notebook
+---
+
+## Data specificity
+- paired samples
+- time course experiments
+- 4 conditions(6 comparisons)
+
+## Data input and output
+Inputs : 
+Proteomics raw data is submitted with uniprot accession as row and samples as columns.
+Annotation file with as columns 1) Uniprot Accession 2) Gene name 
+
+Ouputs :  
+1)  PCA 1/ 2, UMAP, PLS-DA, Distribution after norm
+2)  Heatmap, pathways, figure with pathways
+3)  Scatter plot, Correlation matrix, pathways, figure pathways
+
+
+## Outline 
+### Pre-processing
+Count missing values / PCA 1
+Normalization ( NormalizerDE, selection based on report)
+Plotting Distribution / Dimension reduction : PCA 2 / UMAP / PLS-DA
+
+### Multiple comparisons
+LIMMA : 6 comparisons (UNINF/T1 / T2 / T3) paired samples
+Heatmap (hierarchical clustering) with proteins significant in at least one infected sample compared to control (pvalue  < 0.05).
+Cytoscape Network → Reactome on obtained clusters
+
+### Correlation viral/ host proteins
+Scatter plot log2 (viral_protein_inf_sample/viral_prot_control) vs time after infection
+Calculate averaged profile of viral proteins
+Pearson correlation host proteins/ averaged profile of all viral proteins => select FDR < 0.01
+Cytoscape Network → biological process GO terms (plot network)
+
+
+### clean environment
+```{r}
+rm(list=ls())
+```
+
+### set directory
+```{r setup}
+    knitr::opts_knit$set(root.dir = normalizePath("~/Desktop/Corona_omics/")) 
+```
+
+### load packages
+```{r}
+library(ggplot2)
+library(limma)
+library(dplyr)
+library(xlsx)
+library(RColorBrewer)
+library(gplots)
+library(ggrepel)
+library(knitr)
+library(ggfortify)
+library(NormalyzerDE)
+opts_chunk$set(echo = TRUE)
+options(bitmapType="cairo")
+```
+
+### load own functions
+```{r}
+source("src/usefull_functions.R")
+```
+
+```{r}
+name_ana <- "covid-19_proteomics"
+
+nb_samples <- 3
+
+# define conditions
+t0 <- "UNINF"
+t24 <- "H24PI"
+t48 <- "H48PI"
+t72 <- "H72PI"
+
+# define associated colors
+c_t0 <- "#B1A78C"
+c_t24 <- "#687E8A"
+c_t48 <- "#41607D"
+c_t72 <- "#09253B"
+  
+condition <- as.factor(c(rep(t0, nb_samples), rep(t24, nb_samples), rep(t48, nb_samples), rep(t72, nb_samples)))
+colors <- as.factor(c(rep(c_t0, nb_samples), rep(c_t24, nb_samples), rep(c_t48, nb_samples), rep(c_t72, nb_samples)))
+gg_colors <- c(c_t24,c_t48, c_t72, c_t0)
+
+input <- "data/Proteomics/20200411_L1_Huh7_CoV_TMTPro_Fractions.csv"
+```
+
+```{r}
+dir.create(paste0("processing/", name_ana))
+```
+
+```{r}
+dir.create(paste0("results/", name_ana))
+dir.create(paste0("results/", name_ana, "/figures"))
+dir.create(paste0("results/", name_ana, "/DGE"))
+dir.create(paste0("results/", name_ana, "/Time_series"))
+dir.create(paste0("results/", name_ana, "/GSEA"))
+```
+
+## 1) Pre-processing
+```{r}
+data <- read.csv(input)
+annotationInfo <- select(data, Accession, Gene.Symbol)
+names(annotationInfo)[2] <- "Gene_name"
+```
+
+## select Abundances columns
+```{r}
+data <- select(data, Accession, starts_with("Abundance.."))
+
+rownames(data) <- data$Accession
+data$Accession <- NULL
+
+remov_row <- data[rowSums(is.na(data)) == ncol(data), ]
+ 
+data <- data[rowSums(is.na(data)) != ncol(data), ] ## remove empty lines
+
+## order samples
+data <- data[,c(1, 3, 2, 4, 6, 5, 9, 8, 7, 10, 11, 12)]
+```
+
+## rename samples
+
+```{r}
+new_names <- c(paste0(t0, "_",1:3), paste0(t24,"_",1:3), paste0(t48,"_",1:3), paste0(t72,"_",1:3))
+
+information <- cbind(colnames(data), new_names)
+
+colnames(data) <- new_names
+
+save_file_csv(annotationInfo, "annotationInfo", paste0("processing/", name_ana, "/"))
+save_file_csv(data, "data_corona_filt", paste0("processing/", name_ana, "/"))
+save_file_csv(information, "names_samples", paste0("processing/", name_ana, "/"))
+```
+### check for missing values
+```{r}
+counts <- 1:nrow(data) # create vector of appropriate length
+for(i in 1:nrow(data)){
+    # TRUE will be coerced to 1 for the summing
+    counts[i] <- sum(is.na(data[i,]))
+}
+table(counts) # create the summary
+
+save_file_csv(table(counts), "data_corona_missing_values", paste0("processing/", name_ana, "/"))
+```
+### distribution
+```{r}
+data_2 <-as.matrix(data)
+hist(data_2 , prob=T)
+curve(dnorm(x,mean(data_2),sd(data_2)),add=T,col="red")
+save_figure(data_2, "distribution_", 10, 10)
+```
+
+### PCA before norm
+```{r}
+pca_data <- data.frame(group = condition, 
+                       t(as.matrix(data)))
+```
+
+```{r}
+pca_data[is.na(pca_data)] <-  0
+pca <- prcomp(pca_data[,-1])
+```
+
+```{r}
+a <- autoplot(pca, data = pca_data, colour = 'group', size= 6)+ scale_color_manual(values = gg_colors)
+print(a)
+save_figure(a, "pca_before_norm_", 10, 10)
+```
+
+```{r}
+a <- autoplot(pca, data = pca_data, colour = 'group', size= 6, label = TRUE, shape = FALSE)+ scale_color_manual(values = gg_colors)
+#print(a)
+save_figure(a, "pca_before_norm_labelled", 10, 10)
+```
+
+
+### Quantile normalization
+```{r}
+path_data <- make_data_matrix(data, name_ana)
+path_design <-make_design_matrix(data, name_ana, condition)
+outDir <- "processing/normalization"
+```
+
+```{r}
+#normalyzer(jobName=name_ana, designPath=path_design, dataPath=path_data, outputDir=outDir)
+```
+
+```{r}
+path_results_norm <- paste0(outDir, "/", name_ana,"/Quantile-normalized.txt")
+data_norm <- read.delim(path_results_norm)
+rownames(data_norm) <- rownames(data)
+
+path_results <- paste0("processing/norm_files/", name_ana, "_norm_file.txt")
+
+write.table(data_norm, file = path_results, 
+            sep = "\t", row.names = TRUE, col.names = NA)
+```
+
+
+### distribution after normalization
+```{r}
+data_2 <-as.matrix(data_norm)
+hist(data_2 , prob=T)
+curve(dnorm(x,mean(data_2),sd(data_2)),add=T,col="red")
+save_figure(data_2, "distribution_after_norm_", 10, 10)
+```
+
+### PCA after normalization
+```{r}
+pca_data <- data.frame(group = condition, t(as.matrix(data_norm)))
+```
+
+```{r}
+pca_data[is.na(pca_data)] <-  0
+pca <- prcomp(pca_data[,-1])
+```
+
+```{r}
+b <- autoplot(pca, data = pca_data, colour = 'group', size= 6)+ scale_color_manual(values = gg_colors)
+print(b)
+save_figure(b, "pca_after_norm_", 10, 10)
+```
