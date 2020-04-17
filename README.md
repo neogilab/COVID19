@@ -1,10 +1,12 @@
-# Omics covid-19
+# COVID19
 
-Analyse proteomics and transcriptomics data from cov-19 infected samples using LIMMA pairwise and time series design.
+Commands and codes used for the RNASeq and Proteomics data analysis SARS-Cov2 infected samples
+
+
 
 ## About
 
-Omics covid-19 aims to find biomarkers and terms associated with covid-19 infection in human cells. Pipeline is adapted for low number of samples.
+Analyse proteomics and transcriptomics data from cov-19 infected samples using LIMMA pairwise and time series design. COVID19 aims to find biomarkers and terms associated with covid-19 infection in human cells. Pipeline is adapted for low number of samples.
 
 ## Data specificity
 - paired samples
@@ -41,6 +43,11 @@ Voom transformation
 LIMMA : 6 comparisons (UNINF/T24 / T48 / T72) paired samples
 LIMMA : time serie analysis in infected samples
 
+### Figures generation
+Pvalue heatmap (summary all methods)
+Sankey plot (top 4 pathways)
+Scatter plots (top 4 pathways)
+
 
 ## Installation
 
@@ -58,10 +65,22 @@ python
 ```
 Rscript source/requierements.R
 # This command will install the following packages:
-# sva==3.26.0
+# NormalyzerDE==1.4.0
+# ggfortify==0.4.9
+# xlsx==0.6.3
+# gplots==3.0.3 
+# edgeR==3.28.1
+# limma==3.42.2
+# matrixStats==0.56.0
+# reshape2==1.4.3
+# ggalluvial==0.11.1
+# ggplot2==3.3.0
+# dplyr==0.8.5
 ```
 
 ## Running code
+
+All data should be placed in a folder called data (transcriptomics data must be in a file called Transcriptomics and proteomics data in a file called Proteomics)
 
 ### Proteomics 
 ```
@@ -79,4 +98,10 @@ Rscript -e "rmarkdown::render('covid-19_transcriptomics_pairwise_comp.Rmd')"
 ### Gene set enrichment analysis
 ```
 python3 GSEA.py
+```
+
+### make figures
+```
+Rscript -e "rmarkdown::render('covid-19_figures_heatmap.Rmd')"
+Rscript -e "rmarkdown::render('covid-19_figures_top_4_pathways.Rmd')"
 ```
