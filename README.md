@@ -2,8 +2,6 @@
 
 Commands and codes used for the RNASeq and Proteomics data analysis SARS-Cov2 infected samples
 
-
-
 ## About
 
 Analyse proteomics and transcriptomics data from cov-19 infected samples using LIMMA pairwise and time series design. COVID19 aims to find biomarkers and terms associated with covid-19 infection in human cells. Pipeline is adapted for low number of samples.
@@ -16,37 +14,34 @@ Analyse proteomics and transcriptomics data from cov-19 infected samples using L
 ## Data input and output
 Inputs :
 
-Proteomics :
-Proteomics raw data is submitted with uniprot accession as row and samples as columns.
-Annotation file with as columns 1) Uniprot Accession 2) Gene name
+- Proteomics : Proteomics raw data is submitted with uniprot accession as row and samples as columns. Annotation file with as columns 1) Uniprot Accession 2) Gene name.
 
-Transcriptomics :
-Transcriptomics count data is submitted with Ensembl ID as row and samples as columns.
+- Transcriptomics : Transcriptomics count data is submitted with Ensembl ID as row and samples as columns.
 
 Ouputs :  
-1)  PCA, Distribution after norm
-2)  Proteins / transcripts up or down regulated according to time in infected samples
-3)  Proteins / transcripts up or down regulated in each pairwise comparison
+- PCA, Distribution after norm
+- Proteins / transcripts up or down regulated according to time in infected samples
+- Proteins / transcripts up or down regulated in each pairwise comparison
 
 ## Outline 
 ### Pre-processing Proteomics
-Count missing values / PCA
-Normalization ( NormalizerDE, selection based on report)
-Plotting Distribution / Dimension reduction : PCA 2
+1) Count missing values / PCA
+2) Normalization ( NormalizerDE, selection based on report)
+3) Plotting Distribution / Dimension reduction : PCA 2
 
 ### Pre-processing Transcriptomics
-Calculation of Normalization factors
-Filtering of low abundannce reads
-Voom transformation
+1) Calculation of Normalization factors
+2) Filtering of low abundannce reads
+3) Voom transformation
 
 ### Multiple comparisons
-LIMMA : 6 comparisons (UNINF/T24 / T48 / T72) paired samples
-LIMMA : time serie analysis in infected samples
+4) LIMMA : 6 comparisons (UNINF/T24 / T48 / T72) paired samples
+5) LIMMA : time serie analysis in infected samples
 
 ### Figures generation
-Pvalue heatmap (summary all methods)
-Sankey plot (top 4 pathways)
-Scatter plots (top 4 pathways)
+6) Pvalue heatmap (summary all methods)
+7) Sankey plot (top 4 pathways)
+8) Scatter plots (top 4 pathways)
 
 
 ## Installation
@@ -80,7 +75,7 @@ Rscript source/requierements.R
 
 ## Running code
 
-All data should be placed in a folder called data (transcriptomics data must be in a file called Transcriptomics and proteomics data in a file called Proteomics)
+All data should be placed in a folder called data (transcriptomics data must be in a file called Transcriptomics and proteomics data in a file called Proteomics).
 
 ### Proteomics 
 ```
