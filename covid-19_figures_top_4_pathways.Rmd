@@ -1,0 +1,165 @@
+---
+title: "Sankey plots and scatter plots"
+output: html_notebook
+---
+
+## Proteomics
+
+
+### clean environment
+```{r}
+rm(list=ls())
+```
+
+### set directory
+```{r setup}
+    knitr::opts_knit$set(root.dir = normalizePath("~/Desktop/Corona_omics/")) 
+```
+
+```{r}
+library(dplyr)
+library(ggalluvial)
+library(reshape2)
+library(matrixStats)
+```
+
+```{r}
+up_12_F <- read.delim("results/GSEA_time/12F_up.txt")
+up_12_F <- select(up_12_F, Term, Genes, Overlap, Adjusted.P.value)
+up_12_F$sign <- "up"
+
+up_12_F$Nb_proteins <- gsub("/.*","",up_12_F$Overlap)
+up_12_F$value <- 50
+up_12_F <- up_12_F[order(up_12_F$Adjusted.P.value, decreasing = TRUE),]
+
+```
+
+```{r}
+list_net <- c("HIF-1 signaling pathway", "ErbB signaling pathway","mTOR signaling pathway", "TNF signaling pathway")
+```
+
+
+## Sankey plot viral proteins
+```{r}
+up_12_F <- up_12_F[up_12_F$Term %in% list_net,]
+up_12_F_2 <- data.frame(Node_1 = NA, Node_2 = NA)
+up_12_F$Gene_set <- NULL
+```
+
+```{r}
+write.csv(up_12_F, "list_pathways.csv")
+```
+
+```{r}
+for (i in 1:nrow(up_12_F)){
+  x <- paste0(up_12_F$Genes[i], collapse=" ")
+  y <- as.list(strsplit(x, ";")[[1]])
+  path <- rep(up_12_F[i, 1], length(y))
+  a <-do.call(rbind.data.frame, y)
+  names(a)<- "Node_1"
+  a <-cbind(a, path)
+  names(a)[2]<- "Node_2"
+  up_12_F_2 <-rbind(up_12_F_2, a)
+}
+```
+
+```{r}
+up_12_F_2 <- up_12_F_2[complete.cases(up_12_F_2),]
+up_12_F_2$sign <- "up"
+input_table <- up_12_F_2
+input_table$freq <- seq(1,2*nrow(input_table), by=2)
+```
+
+```{r}
+write.csv(up_12_F_2, "list_pathways_proteins.csv")
+```
+
+```{r}
+A_col <- "#ffa12c"
+B_col <- "#ff872c"
+C_col <- "#fe612c"
+D_col <- "#fd3a2d"
+E_col <- "#f11d28"
+
+ggplot(input_table,
+       aes(weight = freq, axis1 = Node_1, axis2 = Node_2)) +
+  geom_alluvium(aes(fill = Node_2, color = Node_2), 
+                width = 1/12, alpha = 0.3, knot.pos = 0.4) +
+  geom_stratum(width = 1/36, fill = "black", color = "grey")+
+  scale_x_continuous(breaks = 1:2, labels = c("Proteins", "KEGG Terms")) + 
+  ggtitle("Pathway analysis") +
+  theme_minimal()+
+  geom_label(stat = "stratum", label.strata = TRUE, size=2)+
+  theme(legend.position = "none",
+        title = element_text(size = 20),
+        legend.text = element_text(size = 20),
+        axis.text.y = element_blank(),
+        axis.text.x = element_text(size=12, face = "bold")) +
+  scale_fill_manual(values  = c(A_col, B_col, C_col, D_col, E_col)) +
+  scale_color_manual(values = c(A_col, B_col, C_col, D_col, E_col)) +
+
+ggsave("results/figures/sankey_plot_up_antiviral_proteins_2_top_5_pathways_up.pdf", width = 10, height = 10, limitsize = FALSE)
+```
+/home/flomik/Desktop/Corona_omics/
+
+### make scatter plots 
+# load expression data
+```{r}
+prot <- read.delim("processing/norm_files/covid-19_proteomics_norm_file.txt")
+names(prot)[1] <- "Accession"
+AnnotationInfo <- read.csv("processing/covid-19_proteomics/covid-19_proteomics_annotationInfo.csv")
+
+prot <- merge(prot, AnnotationInfo, by = "Accession")
+names(prot)[15] <- "Node_1"
+
+prot <- merge(input_table, prot, by ="Node_1")
+prot$sign <- NULL
+prot$freq <- NULL
+prot$Accession <- NULL
+prot$X <- NULL
+```
+
+
+```{r}
+prot <- prot[prot$Node_2 %in% list_net, ]
+prot_2 <- as.matrix(prot[,-c(1,2)])
+```
+
+```{r}
+prot$med_uninf <- rowMedians(prot_2[,c(1:3)])
+prot$med_24 <- rowMedians(prot_2[,c(4:6)])
+prot$med_48 <- rowMedians(prot_2[,c(7:9)])
+prot$med_72 <- rowMedians(prot_2[,c(10:12)])
+
+prot$med_24 <- prot$med_24 - prot$med_uninf
+prot$med_48 <- prot$med_48 - prot$med_uninf
+prot$med_72 <- prot$med_72 - prot$med_uninf
+```
+
+```{r}
+prot_2 <- select(prot, Node_1, Node_2, med_24, med_48, med_72)
+prot_2[,c(3:5)] <- data.frame(t(scale(t(prot_2[,c(3:5)]))))
+prot_2 <- melt(prot_2, id.vars = c("Node_1", "Node_2"))
+prot_2$variable <- as.factor(prot_2$variable)
+```
+
+```{r}
+prot_3 <- prot_2
+prot_2$time <- c(rep(1, (nrow(prot_3)/3)), rep(2, (nrow(prot_3)/3)),rep(3, (nrow(prot_3)/3)))
+```
+
+```{r}
+a <- ggplot(prot_2, aes(y = value, x = variable))+ geom_line(aes(group = Node_1), size=0.5, lineend = "round", linejoin = "round", color = "grey")+theme(legend.position = "none")+ 
+  facet_grid(~ Node_2, scales='free_x', space="free_x")+
+  scale_colour_discrete(guide = 'none') +
+  scale_x_discrete(expand=c(0, 1)) + coord_cartesian(xlim = c(0.9, 3.111), expand = FALSE)+ scale_x_discrete(labels=c("med_24" = "24h", "med_48" = "48h", "med_72" = "72h"))+ylim(c(-1.5, 1.6))+ theme(strip.background = element_blank(), strip.text.x = element_text(size = 9), axis.text.x =element_text(colour="black", size = 9), axis.text.y = element_text(colour="black", size = 6), legend.position = "none") +
+  xlab("Time") + ylab("Z score")
+
+a + geom_boxplot(aes(group = variable), outlier.colour="black", width=0.2, lwd=0.4, outlier.size = 0.2)
+
+ggsave("results/figures/up_pathways_scatter_2.pdf", width = 7, height = 2, limitsize = FALSE)
+```
+
+
+
+

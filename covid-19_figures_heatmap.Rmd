@@ -1,0 +1,157 @@
+---
+title: "Heatmap all results"
+output: html_notebook
+---
+
+
+### clean environment
+```{r}
+rm(list=ls())
+```
+
+### set directory
+```{r setup}
+    knitr::opts_knit$set(root.dir = normalizePath("~/Desktop/Corona_omics/")) 
+```
+
+```{r}
+filter_paths <- function(file, name){
+  file <- file[file$Adjusted.P.value < 0.05,]
+  file <- file[,c(2,5)]
+  names(file)[2] <- name
+  return(file)
+}
+```
+
+```{r}
+library(xlsx)
+library(ggplot2)
+library(reshape2)
+```
+
+## Parse files
+```{r}
+txn_up_48_72 <- read.delim("results/GSEA_pairs/txn_up_48_72.txt")
+txn_up_48_72 <- filter_paths(txn_up_48_72, "Txn_Up_48_72")
+
+txn_up_24_48 <- read.delim("results/GSEA_pairs/txn_up_24_48.txt")
+txn_up_24_48 <- filter_paths(txn_up_24_48, "Txn_Up_24_48")
+
+txn_up_0_24 <- read.delim("results/GSEA_pairs/txn_up_0_24.txt")
+txn_up_0_24 <- filter_paths(txn_up_0_24, "Txn_Up_0_24")
+
+txn_down_48_72 <- read.delim("results/GSEA_pairs/txn_down_48_72.txt")
+txn_down_48_72 <- filter_paths(txn_down_48_72, "Txn_Down_48_72")
+txn_down_24_48 <- read.delim("results/GSEA_pairs/txn_down_24_48.txt")
+txn_down_24_48 <- filter_paths(txn_down_24_48, "Txn_Down_24_48")
+
+txn_down_0_24 <- read.delim("results/GSEA_pairs/txn_down_0_24.txt")
+txn_down_0_24 <- filter_paths(txn_down_0_24, "Txn_Down_0_24")
+
+prot_up_48_72 <- read.delim("results/GSEA_pairs/prot_up_48_72.txt")
+prot_up_48_72 <- filter_paths(prot_up_48_72, "Prot_Up_48_72")
+
+prot_up_24_48 <- read.delim("results/GSEA_pairs/prot_up_24_48.txt")
+prot_up_24_48 <- filter_paths(prot_up_24_48, "Prot_Up_24_48")
+
+txn_up <- read.delim("results/GSEA_time/12F_up_txn.txt")
+txn_up <- filter_paths(txn_up, "Txn_Up")
+
+txn_down <- read.delim("results/GSEA_time/12F_down_txn.txt")
+txn_down <- filter_paths(txn_down, "Txn_Down")
+
+prot_up <- read.delim("results/GSEA_time/12F_up.txt")
+prot_up <- filter_paths(prot_up, "Prot_Up")
+
+prot_down  <- read.delim("results/GSEA_time/12F_down.txt")
+prot_down <- filter_paths(prot_down, "Prot_Down")
+```
+
+```{r}
+table_up <- merge(prot_up, txn_up, by = "Term", all.x = "TRUE")
+table_up$Prot_Up_0_24 <- NA
+
+table_up <- merge(table_up, prot_up_24_48 , by = "Term", all.x = "TRUE")
+table_up <- merge(table_up, prot_up_48_72 , by = "Term", all.x = "TRUE")
+table_up <- merge(table_up, txn_up_0_24, by = "Term", all.x = "TRUE")
+
+table_up <- merge(table_up, txn_up_24_48, by = "Term", all.x = "TRUE")
+table_up <- merge(table_up, txn_up_48_72, by = "Term", all.x = "TRUE")
+```
+
+
+```{r}
+rownames(table_up) <- table_up$Term
+table_up <- table_up[order(table_up$Prot_Up, decreasing = TRUE),]
+#table_up <- table_up[c(1:30),]
+position <- table_up$Term
+```
+
+```{r}
+
+
+table_up_2 <- melt(table_up, id.vars = "Term")
+```
+
+```{r}
+table_up_2$type <- c(rep("Time series", 2*37), rep("Pairwise Comparison", 37*6))
+```
+
+```{r}
+names(table_up_2)
+```
+
+```{r}
+a <- ggplot(table_up_2, aes(y = Term, x = variable, fill = value))+ 
+  geom_tile()+scale_fill_continuous(low="darkred", high="thistle2", 
+                       guide="colorbar",na.value="grey")+ theme(axis.text.x=element_text(angle=90), axis.text.y=element_text())+ scale_x_discrete(labels=c("Prot_Up" = "Prot","Txn_Up" = "Trans",
+                                               "Prot_Up_0_24" = "Prot 0-24", "Prot_Up_24_48" = "Prot 24-48", "Prot_Up_48_72" = "Prot 48-72", 
+                                               "Txn_Up_0_24" = "Trans 0-24", "Txn_Up_24_48" = "Trans 24-48", "Txn_Up_48_72" = "Trans 48-72")) + 
+  labs(title="", x="", y="", fill="") + scale_y_discrete(limits = position)+ 
+  facet_grid(~ type, scales='free_x', space="free_x")
+
+
+ggsave("results/figures/heatmap_pathway_analysis_up.pdf", height = 7)
+```
+
+
+table_down <- merge(prot_down, txn_down, by = "Term", all.x = "TRUE")
+table_down$Prot_Down_0_24 <- NA
+table_down$Prot_Down_24_48 <- NA
+table_down$Prot_Down_48_72 <- NA
+
+table_down <- merge(table_down, txn_down_0_24, by = "Term", all.x = "TRUE")
+table_down <- merge(table_down, txn_down_24_48, by = "Term", all.x = "TRUE")
+table_down <- merge(table_down, txn_down_48_72, by = "Term", all.x = "TRUE")
+
+
+names(table_down)
+
+
+rownames(table_down) <- table_down$Term
+table_down <- table_down[order(table_down$Prot_Down_or, decreasing = TRUE),]
+
+library(reshape2)
+
+table_down_2 <- melt(table_down, id.vars = "Term")
+
+
+table_down_2$type <- c(rep("Time series", 2*2), rep("Pairwise Comparison", 2*6))
+
+
+names(table_down_2)
+
+ggplot(table_down_2, aes(y = Term, x = variable, fill = value))+ 
+  geom_tile()+scale_fill_continuous(low="darkblue", high="#d2eeee", 
+                       guide="colorbar",na.value="grey")+ theme(axis.text.x=element_text(angle=90), axis.text.y=element_text())+ scale_x_discrete(labels=c("Prot_Down_or" = "Prot","Txn_Down" = "Trans",
+                                               "Prot_Down_0_24" = "Prot 0-24", "Prot_Down_24_48" = "Prot 24-48", "Prot_Down_48_72" = "Prot 48-72", 
+                                               "Txn_Down_0_24" = "Trans 0-24", "Txn_Down_24_48" = "Trans 24-48", "Txn_Down_48_72" = "Trans 48-72")) + 
+  labs(title="", x="", y="", fill="") + scale_y_discrete(limits = position)+ 
+  facet_grid(~ type, scales='free_x', space="free_x")
+
+
+ggsave("heatmap_pathway_analysis_down.pdf")
+```
+
+
+
