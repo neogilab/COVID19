@@ -96,3 +96,5 @@ python3 GSEA.py
 Rscript -e "rmarkdown::render('covid-19_figures_heatmap.Rmd')"
 Rscript -e "rmarkdown::render('covid-19_figures_top_4_pathways.Rmd')"
 ```
+## Network Analysis
+Code used for network analysis of proteomics and transcriptomics analysis is included in the folder "network_analysis"
