@@ -16,8 +16,8 @@ Inputs :
 
 Outputs :  
 - PCA, Distribution after normalization
-- Up or down regulated Proteins / transcripts (time series analysis)
-- Up or down regulated Proteins / transcripts (pair-wise analysis)
+- Up or down regulated proteins / transcripts (time series analysis)
+- Up or down regulated proteins / transcripts (pair-wise analysis)
 
 ## Outline 
 ### Pre-processing (Proteomics)
@@ -30,7 +30,7 @@ Outputs :
 2) Filtering of low abundant genes
 3) Voom transformation
 
-### Multiple comparisons
+### Expression Analysis
 1) LIMMA : 6 pair-wise comparisons (UNINF/T24 / T48 / T72)
 2) LIMMA : time serie analysis (T24, T48, T72)
 
