@@ -30,11 +30,11 @@ Outputs :
 2) Filtering of low abundant genes
 3) Voom transformation
 
-### Expression Analysis
+### Expression analysis
 1) LIMMA : 6 pair-wise comparisons (UNINF/T24 / T48 / T72)
 2) LIMMA : time serie analysis (T24, T48, T72)
 
-### Figures generation
+### Figure generation
 1) Pathway enrichment heatmap (All analysis)
 2) Sankey plot (top 4 pathways)
 3) Scatter plots (top 4 pathways)
@@ -69,7 +69,7 @@ Rscript source/requierements.R
 # dplyr==0.8.5
 ```
 
-## Running code
+## Execution
 
 All data should be placed in a folder called data (transcriptomics data must be in a file named Transcriptomics and proteomics data in a file named Proteomics).
 
