@@ -32,7 +32,7 @@ Outputs :
 
 ### Expression analysis
 1) LIMMA : 6 pair-wise comparisons (UNINF/T24 / T48 / T72)
-2) LIMMA : time serie analysis (T24, T48, T72)
+2) LIMMA : time series analysis (T24, T48, T72)
 
 ### Figure generation
 1) Pathway enrichment heatmap (All analysis)
