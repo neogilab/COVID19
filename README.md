@@ -4,42 +4,38 @@ Commands and codes used for the RNASeq and Proteomics data analysis SARS-Cov2 in
 
 ## About
 
-Analyse proteomics and transcriptomics data from cov-19 infected samples using LIMMA pairwise and time series design. COVID19 aims to find biomarkers and terms associated with covid-19 infection in human cells. Pipeline is adapted for low number of samples.
-
-## Data specificity
-- paired samples
-- time course experiments
-- 4 conditions(6 comparisons)
+The project aims to identify host cellular response against SARS-CoV2 infection in Huh7 cell lines. A time-series integrative proteo-transcriptomics analysis design was employed in the project. The Huh7 cells were collected at 24, 48, 72 hours post infection and RNASeq & Proteomics data were generated. Also an uninfected sample was included which used as a control. There were three replicates in the design.
+Proteomics and transcriptomics data were analysed using R package LIMMA, both for pairwise and time series analysis. 
 
 ## Data input and output
 Inputs :
 
-- Proteomics : Proteomics raw data is submitted with uniprot accession as row and samples as columns. Annotation file with as columns 1) Uniprot Accession 2) Gene name.
+- Proteomics : Proteomics raw data with uniprot accession as rows and samples as columns. Annotation file with as columns 1) Uniprot Accession 2) Gene name.
 
-- Transcriptomics : Transcriptomics count data is submitted with Ensembl ID as row and samples as columns.
+- Transcriptomics : Transcriptomics count data with Ensembl ID as rows and samples as columns.
 
 Ouputs :  
-- PCA, Distribution after norm
-- Proteins / transcripts up or down regulated according to time in infected samples
-- Proteins / transcripts up or down regulated in each pairwise comparison
+- PCA, Distribution after normalization
+- Up or down regulated Proteins / transcripts (time series analysis)
+- Up or down regulated Proteins / transcripts (pair-wise analysis)
 
 ## Outline 
-### Pre-processing Proteomics
+### Pre-processing (Proteomics)
 1) Count missing values / PCA
-2) Normalization ( NormalizerDE, selection based on report)
+2) Normalization
 3) Plotting Distribution / Dimension reduction : PCA 2
 
-### Pre-processing Transcriptomics
+### Pre-processing (Transcriptomics)
 1) Calculation of Normalization factors
-2) Filtering of low abundannce reads
+2) Filtering of low abundant genes
 3) Voom transformation
 
 ### Multiple comparisons
-4) LIMMA : 6 comparisons (UNINF/T24 / T48 / T72) paired samples
-5) LIMMA : time serie analysis in infected samples
+4) LIMMA : 6 pair-wise comparisons (UNINF/T24 / T48 / T72)
+5) LIMMA : time serie analysis (T24, T48, T72)
 
 ### Figures generation
-6) Pvalue heatmap (summary all methods)
+6) Pathway enrichment heatmap (All analysis)
 7) Sankey plot (top 4 pathways)
 8) Scatter plots (top 4 pathways)
 
@@ -53,9 +49,9 @@ cd COVID19/
 ```
 
 ## Requirements
-python
-1. A linux distribution.
-2. Install the few required **R packages** :
+All the analysis were performed in Linux-ubuntu environment.
+1. Python3.5+ (Please check https://github.com/zqfang/gseapy for GSEAPY requirements.)
+2. R packages (Analysis and figure generation) :
 
 ```
 Rscript source/requierements.R
@@ -75,7 +71,7 @@ Rscript source/requierements.R
 
 ## Running code
 
-All data should be placed in a folder called data (transcriptomics data must be in a file called Transcriptomics and proteomics data in a file called Proteomics).
+All data should be placed in a folder called data (transcriptomics data must be in a file named Transcriptomics and proteomics data in a file named Proteomics).
 
 ### Proteomics 
 ```
