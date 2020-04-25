@@ -10,11 +10,11 @@ Proteomics and transcriptomics data were analysed using R package LIMMA, both fo
 ## Data input and output
 Inputs :
 
-- Proteomics : Proteomics raw data with uniprot accession as rows and samples as columns. Annotation file with as columns 1) Uniprot Accession 2) Gene name.
+- Proteomics : Proteomics raw data with uniprot accession as rows and samples as columns. Annotation file with as columns 1)            Uniprot Accession 2) Gene name.
 
 - Transcriptomics : Transcriptomics count data with Ensembl ID as rows and samples as columns.
 
-Ouputs :  
+Outputs :  
 - PCA, Distribution after normalization
 - Up or down regulated Proteins / transcripts (time series analysis)
 - Up or down regulated Proteins / transcripts (pair-wise analysis)
@@ -31,13 +31,13 @@ Ouputs :
 3) Voom transformation
 
 ### Multiple comparisons
-4) LIMMA : 6 pair-wise comparisons (UNINF/T24 / T48 / T72)
-5) LIMMA : time serie analysis (T24, T48, T72)
+1) LIMMA : 6 pair-wise comparisons (UNINF/T24 / T48 / T72)
+2) LIMMA : time serie analysis (T24, T48, T72)
 
 ### Figures generation
-6) Pathway enrichment heatmap (All analysis)
-7) Sankey plot (top 4 pathways)
-8) Scatter plots (top 4 pathways)
+1) Pathway enrichment heatmap (All analysis)
+2) Sankey plot (top 4 pathways)
+3) Scatter plots (top 4 pathways)
 
 
 ## Installation
