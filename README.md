@@ -16,8 +16,8 @@ Inputs :
 
 Outputs :  
 - PCA, Distribution after normalization
-- Up or down regulated proteins / transcripts (time series analysis)
-- Up or down regulated proteins / transcripts (pair-wise analysis)
+- Up or down regulated proteins & transcripts (time series analysis)
+- Up or down regulated proteins & transcripts (pair-wise analysis)
 
 ## Outline 
 ### Pre-processing (Proteomics)
